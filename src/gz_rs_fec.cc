@@ -2,7 +2,7 @@
  * @Author: gimphammer@gmail.com
  * @Date: 2026-05-05 17:49:53
  * @LastEditors: gimphammer@gmail.com
- * @LastEditTime: 2026-05-10 17:03:59
+ * @LastEditTime: 2026-05-10 17:36:57
  * @Copyright: Copyright (c) 2026 by gimphammer@gmail.com, All rights reserved.
  * @Description: [None]
  */
@@ -11,7 +11,7 @@
 
 
 #include "internal_def.h"
-#include "matrix.h"
+#include "gz_rs_fec.h"
 #include "misc.h"
 #include <iomanip>
 #include <iostream>
@@ -19,11 +19,19 @@
 namespace gz_rs_fec {
 
 
+Package::Package()
+{
+  this->buf = nullptr;
+  this->data_size = 0;
+  this->cap_size  = 0;
+  this->idx_in_group = -1;  
+}
+
 
 Package::Package(uint32_t cap_size)
 {  
   this->buf = new uint8_t[cap_size];
-  this->data_size = cap_size;
+  this->data_size = 0;
   this->cap_size  = cap_size;
   this->idx_in_group = -1;
 }
@@ -70,6 +78,10 @@ Package::Package(Package&& src)
 
 Package& Package::operator=(const Package& src)
 {
+  if (&src == this)
+    return *this;
+
+
   delete[] buf;
   buf = nullptr;
   this->data_size = 0;
@@ -92,6 +104,10 @@ Package& Package::operator=(const Package& src)
 
 Package& Package::operator=(Package&& src)
 {
+  if (&src == this)
+    return *this;
+
+
   delete[] buf;
   buf = nullptr;
   this->data_size = 0;
@@ -111,7 +127,7 @@ Package& Package::operator=(Package&& src)
   return *this;
 }
 
-RSMatrixGF256::RSMatrixGF256(uint32_t n, uint32_t k) :
+RSFECProcessor::RSFECProcessor(uint32_t n, uint32_t k) :
           n_(n),
           k_(k),
           enc_matrix_(CreateEncMatriax(n,k)),
@@ -128,15 +144,15 @@ RSMatrixGF256::RSMatrixGF256(uint32_t n, uint32_t k) :
  * 
  */
 std::vector<Package> 
-RSMatrixGF256::Encode(const std::vector<Package>& src_pkgs)
+RSFECProcessor::Encode(const std::vector<Package>& src_pkgs)
 {
   if (!CheckInputPackages(src_pkgs)) {
-    std::cout << "[ERR] RSMatrixGF256::Encode() input package invalid";
+    std::cout << "[ERR] RSFECProcessor::Encode() input package invalid";
     return {};
   }
 
   if (src_pkgs.size() != k_){
-    std::cout << "[ERR] RSMatrixGF256::Encode() input packages count is"
+    std::cout << "[ERR] RSFECProcessor::Encode() input packages count is"
               << src_pkgs.size() << ", not " << k_;
     return {};
   }
@@ -157,15 +173,15 @@ RSMatrixGF256::Encode(const std::vector<Package>& src_pkgs)
 
 
 std::vector<Package> 
-RSMatrixGF256::Decode(const std::vector<Package>& rcv_pkgs)
+RSFECProcessor::Decode(const std::vector<Package>& rcv_pkgs)
 {
   if (!CheckInputPackages(rcv_pkgs)) {
-    std::cout << "[ERR] RSMatrixGF256::Decode() input package invalid";
+    std::cout << "[ERR] RSFECProcessor::Decode() input package invalid";
     return {};
   }
   
   if (rcv_pkgs.size() < k_) {
-    std::cout << "[ERR] RSMatrixGF256::Decode(), input package count < k";
+    std::cout << "[ERR] RSFECProcessor::Decode(), input package count < k";
     return {};    
   }
 
@@ -184,11 +200,12 @@ RSMatrixGF256::Decode(const std::vector<Package>& rcv_pkgs)
       first_dec_ = false;
   }
 
-  std::vector<Package> ret_pkgs = AllocPackages(rcv_pkgs[0].data_size, 
-                                                rcv_pkgs.size());
+  int32_t pkg_count = static_cast<int32_t>(rcv_pkgs.size());
+  std::vector<Package> ret_pkgs = AllocPackages(rcv_pkgs[0].data_size,
+                                                pkg_count);
 
-  int32_t data_len = rcv_pkgs[0].data_size;
-  for (int32_t i=0; i<data_len; i++) {
+  uint32_t data_len = rcv_pkgs[0].data_size;
+  for (uint32_t i=0; i<data_len; i++) {
     DecOneBytesForAllPackage(rcv_pkgs, i, ret_pkgs);
   }
   
@@ -196,7 +213,7 @@ RSMatrixGF256::Decode(const std::vector<Package>& rcv_pkgs)
 } //end of Decode
 
 
-std::vector<Package> RSMatrixGF256::AllocPackages(int32_t data_size, 
+std::vector<Package> RSFECProcessor::AllocPackages(int32_t data_size, 
                                                   int32_t pkg_count)
 {
   std::vector<Package> pkgs(pkg_count);
@@ -213,7 +230,7 @@ std::vector<Package> RSMatrixGF256::AllocPackages(int32_t data_size,
 
 
 
-void RSMatrixGF256::EncOneByteForAllOutputPkgs(const std::vector<Package>& src_pkgs, 
+void RSFECProcessor::EncOneByteForAllOutputPkgs(const std::vector<Package>& src_pkgs, 
                                               int32_t data_idx,
                                               std::vector<Package>& enc_pkgs)
 {
@@ -234,7 +251,7 @@ void RSMatrixGF256::EncOneByteForAllOutputPkgs(const std::vector<Package>& src_p
  * D = Gs^-1 
  * [X] = [D] * [Y] 
  */
-void RSMatrixGF256::DecOneBytesForAllPackage(const std::vector<Package>& rcv_pkgs, 
+void RSFECProcessor::DecOneBytesForAllPackage(const std::vector<Package>& rcv_pkgs, 
                                              int32_t byte_idx, 
                                              std::vector<Package>& dec_pkgs)
 {
@@ -250,7 +267,7 @@ void RSMatrixGF256::DecOneBytesForAllPackage(const std::vector<Package>& rcv_pkg
   return;
 }
 
-bool RSMatrixGF256::CheckInputPackages(const std::vector<Package>& fec_group)
+bool RSFECProcessor::CheckInputPackages(const std::vector<Package>& fec_group)
 {
   if (fec_group.empty())
     return false;
@@ -284,7 +301,7 @@ bool RSMatrixGF256::CheckInputPackages(const std::vector<Package>& fec_group)
  * 
  */
 Matrix2DUInt8 
-RSMatrixGF256::CreateEncMatriax(uint32_t n, uint32_t k)
+RSFECProcessor::CreateEncMatriax(uint32_t n, uint32_t k)
 {
   Matrix2DUInt8 enc_mat(n, Matrix1DUint8(k));
   for (uint32_t i=0; i<k; i++) {
@@ -337,7 +354,7 @@ RSMatrixGF256::CreateEncMatriax(uint32_t n, uint32_t k)
  *  Than we can got Gs^1, which is just the dec matrix, we rename is as D
  */
 Matrix2DUInt8 
-RSMatrixGF256::CreateDecMatrix(const std::vector<bool>& rcv_indicators)
+RSFECProcessor::CreateDecMatrix(const std::vector<bool>& rcv_indicators)
 {  
   //indicate status of all n package, so size should be n_
   //ture mea
@@ -372,7 +389,7 @@ RSMatrixGF256::CreateDecMatrix(const std::vector<bool>& rcv_indicators)
  *  [I, A]  -->  [A^-1, I]
  */
 Matrix2DUInt8
-RSMatrixGF256::GetInverseMatrixByGuassianElemination(Matrix2DUInt8& mat)
+RSFECProcessor::GetInverseMatrixByGuassianElemination(Matrix2DUInt8& mat)
 {
   
   int32_t k = mat.size();
@@ -456,7 +473,7 @@ RSMatrixGF256::GetInverseMatrixByGuassianElemination(Matrix2DUInt8& mat)
 
 
 
-void RSMatrixGF256::Switch1DMatrix(Matrix1DUint8 &mat_a, Matrix1DUint8 &mat_b)
+void RSFECProcessor::Switch1DMatrix(Matrix1DUint8 &mat_a, Matrix1DUint8 &mat_b)
 {
   if (mat_a.size() != mat_b.size()) {
     std::cout << "[ERR] Switch1DMatrix() a.size() != b.size()";
@@ -476,7 +493,7 @@ void RSMatrixGF256::Switch1DMatrix(Matrix1DUint8 &mat_a, Matrix1DUint8 &mat_b)
 /**
  * a = a + b*b_tims
  */
-void RSMatrixGF256::Matrix1DAddition(uint8_t *a, uint8_t*b, 
+void RSFECProcessor::Matrix1DAddition(uint8_t *a, uint8_t*b, 
                                      uint8_t b_times, int32_t count)
 {
   for (int32_t i=0; i<count; i++) {
@@ -492,9 +509,9 @@ void RSMatrixGF256::Matrix1DAddition(uint8_t *a, uint8_t*b,
  *  {0x11, 0x12, 0x92, ...., 0x85}
  */
 
-std::string RSMatrixGF256::DbgPrintMatrix1D(const Matrix1DUint8& mat,
+std::string RSFECProcessor::DbgPrintMatrix1D(const Matrix1DUint8& mat,
                                             const std::string& log_prefix, 
-                                            bool return_log = false)
+                                            bool return_log)
 {
   oss_1d_.str("");
 
@@ -541,7 +558,7 @@ std::string RSMatrixGF256::DbgPrintMatrix1D(const Matrix1DUint8& mat,
  *    {},
  *  }
  */
-void RSMatrixGF256::DbgPrintMatrix2D(const Matrix2DUInt8& mat,
+void RSFECProcessor::DbgPrintMatrix2D(const Matrix2DUInt8& mat,
                                      const std::string& log_prefix)
 {
   oss_2d_.str("");
