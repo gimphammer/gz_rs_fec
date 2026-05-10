@@ -2,7 +2,7 @@
  * @Author: gimphammer@gmail.com
  * @Date: 2026-05-01 12:21:54
  * @LastEditors: gimphammer@gmail.com
- * @LastEditTime: 2026-05-05 14:41:54
+ * @LastEditTime: 2026-05-09 17:56:01
  * @Copyright: Copyright (c) 2026 by gimphammer@gmail.com, All rights reserved.
  * @Description: [None]
  */
@@ -312,7 +312,7 @@ const uint8_t kGF256MulTable[256][256] = {
 
 
 
-const uint8_t kInverseElement[256] =
+const uint8_t kMIETable[256] =
 {
   //start index: 0
   0x00, 0x01, 0x8d, 0xf6, 0xcb, 0x52, 0x7b, 0xd1, 0xe8, 0x4f, 0x29, 0xc0, 0xb0, 0xe1, 0xe5, 0xc7,

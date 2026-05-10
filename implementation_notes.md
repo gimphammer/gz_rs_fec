@@ -2,9 +2,9 @@
 
 实现点：
 
-1、乘法表
+~~1、乘法表~~
 
-2、逆元表
+~~2、逆元表~~
 
 3、生成矩阵-柯西矩阵，不同的(n,k)不一样
 
@@ -17,6 +17,12 @@
 7、接口设计
 
 8、术语原文
+
+
+
+
+
+
 
 
 
@@ -39,3 +45,11 @@ RS FEC -- Reed-Solomon Forward Error Correction
 乘法逆元：Multiplicative inverse
 
 有限域：Finite Field
+
+柯西矩阵：Cauchy Matrix
+
+高斯消元：Gaussian Elimination
+
+上三角：Upper Triangular Matrix
+
+超定方程：Overdetermined equations
