@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VariablesViewState
+   version = "1.0">
+   <ContextStates>
+      <ContextState
+         contextName = "gz_rs_fec::RSFECProcessor::CreateDecMatrix:gz_rs_fec.cc">
+         <PersistentStrings>
+            <PersistentString
+               value = "rcv_indicators">
+            </PersistentString>
+         </PersistentStrings>
+      </ContextState>
+      <ContextState
+         contextName = "main:main.cpp">
+         <PersistentStrings>
+            <PersistentString
+               value = "src_pkgs[j].buf">
+            </PersistentString>
+         </PersistentStrings>
+      </ContextState>
+      <ContextState
+         contextName = "gz_rs_fec::RSFECProcessor::DbgPrintMatrix2D:gz_rs_fec.cc">
+      </ContextState>
+   </ContextStates>
+</VariablesViewState>

@@ -2,7 +2,7 @@
  * @Author: gimphammer@gmail.com
  * @Date: 2026-05-05 17:49:53
  * @LastEditors: gimphammer@gmail.com
- * @LastEditTime: 2026-05-10 17:36:57
+ * @LastEditTime: 2026-05-13 19:00:01
  * @Copyright: Copyright (c) 2026 by gimphammer@gmail.com, All rights reserved.
  * @Description: [None]
  */
@@ -81,23 +81,28 @@ Package& Package::operator=(const Package& src)
   if (&src == this)
     return *this;
 
-
-  delete[] buf;
-  buf = nullptr;
-  this->data_size = 0;
-  this->cap_size  = 0;
+  //copy assignment is focus on copy data, 
+  //it's not the target the make buffer length to be the same
+  if (this->cap_size < src.data_size) {
+    delete[] buf;
+    buf = nullptr;
+    this->data_size = 0;
+    this->cap_size  = 0;
+  }
   this->idx_in_group = -1;  
 
-  if (src.cap_size) {
-    buf = new uint8_t[src.cap_size];
-    if (src.data_size) {
-      std::memcpy(this->buf, src.buf, src.data_size);
-      this->data_size = src.data_size;
-    }
-    this->cap_size = src.cap_size;    
+  if (!this->buf && src.buf) {
+    this->buf = new uint8_t[src.cap_size];
+    this->cap_size  = src.cap_size;
+    this->data_size = 0;
   }
-  this->idx_in_group = src.idx_in_group;
 
+  if (src.data_size) {
+    std::memcpy(this->buf, src.buf, src.data_size);
+    this->data_size = src.data_size;
+  }
+
+  this->idx_in_group = src.idx_in_group;
   return *this;
 }
 
@@ -130,6 +135,7 @@ Package& Package::operator=(Package&& src)
 RSFECProcessor::RSFECProcessor(uint32_t n, uint32_t k) :
           n_(n),
           k_(k),
+          first_dec_(true),
           enc_matrix_(CreateEncMatriax(n,k)),
           last_rcv_pattern_(std::vector<bool>(n))
 {
@@ -218,13 +224,11 @@ std::vector<Package> RSFECProcessor::AllocPackages(int32_t data_size,
 {
   std::vector<Package> pkgs(pkg_count);
 
-  for (auto pkg : pkgs) {
+  for (auto &pkg : pkgs) {
     pkg.buf = new uint8_t[data_size];
     pkg.data_size = data_size;
     pkg.cap_size = data_size;
   }
-
-
   return pkgs;
 }
 
@@ -327,7 +331,8 @@ RSFECProcessor::CreateEncMatriax(uint32_t n, uint32_t k)
   }
 
 #ifdef DEBUG
-  DbgPrintMatrix2D(enc_mat);
+  std::string log_prefix = "Create Enc Matrix:\n";
+  DbgPrintMatrix2D(enc_mat, log_prefix);
 #endif
 
   return enc_mat;
@@ -364,12 +369,16 @@ RSFECProcessor::CreateDecMatrix(const std::vector<bool>& rcv_indicators)
   //1. get selected lines from enc_matrix to organize the g_selected_mat
   Matrix2DUInt8 g_selected_mat(k_, Matrix1DUint8(k_));
   uint32_t rcv_count=0;
-  for (int32_t i=0; i<n_, rcv_count == k_; i++) {
+  for (int32_t i=0; i<n_, rcv_count < k_; i++) {
     if (rcv_indicators[i]) {
       g_selected_mat[rcv_count] = enc_matrix_[i];
       rcv_count++;
     }
   }
+  
+#ifdef DEBUG
+  DbgPrintMatrix2D(g_selected_mat, "g_selected_mat:\n");
+#endif
 
   if (rcv_count != k_)
     return {};
@@ -378,6 +387,10 @@ RSFECProcessor::CreateDecMatrix(const std::vector<bool>& rcv_indicators)
   Matrix2DUInt8 dec_mat = 
     GetInverseMatrixByGuassianElemination(g_selected_mat);
 
+#ifdef DEBUG
+  DbgPrintMatrix2D(dec_mat, "dec_mat generated:\n");
+#endif
+  
   return dec_mat;
 }
 
@@ -408,7 +421,7 @@ RSFECProcessor::GetInverseMatrixByGuassianElemination(Matrix2DUInt8& mat)
   DbgPrintMatrix2D(work_mat, "init [I, A] = ");
 #endif 
 
-
+  
   //2. [I, A] --> [A^-1, I]
   //2.1 trans A to upper triangular matrix
   for (int32_t line = 0; line < k; line++) {
@@ -422,7 +435,16 @@ RSFECProcessor::GetInverseMatrixByGuassianElemination(Matrix2DUInt8& mat)
         if (work_mat[line_2_find][target_y_pos]) {          
           Switch1DMatrix(work_mat[line_2_find], work_mat[line]);
           find_pivot = true;
-        }        
+//#ifdef DEBUG
+//          std::ostringstream dbg_oss;
+//          dbg_oss << "work_mat, now process line(" << line
+//                  <<"), switch to   line(" << line_2_find
+//                  <<"), after switch:\n";
+//          DbgPrintMatrix2D(work_mat, dbg_oss.str(), true);
+//          int aaaa = 1;
+//#endif
+          break;
+        }
       }
 
       if (!find_pivot) {
@@ -431,8 +453,23 @@ RSFECProcessor::GetInverseMatrixByGuassianElemination(Matrix2DUInt8& mat)
         return {};
       }
     }
+
+    //归一化、并让剩余的行，都 加倍减去当前行
+    Normalize1DMatrix(work_mat[line].data(), 2*k_, work_mat[line][target_y_pos]);
+    for (int32_t below_line = line + 1; below_line < k; below_line++) {
+      uint8_t factor = work_mat[below_line][target_y_pos];
+      if (work_mat[below_line][target_y_pos]) { //reduce operation overhead
+        //below_line = below_line - factor * upline;
+        Matrix1DAddition(work_mat[below_line].data(), work_mat[line].data(), 
+                        factor, 2*k_);
+      }
+    }
   }
 
+#ifdef DEBUG
+  DbgPrintMatrix2D(work_mat, "work_mat position preparation done:\n");
+#endif
+  
   /**
    * 2.2 perform elimination back to eliminate all element which
    *     is not equal to zero
@@ -463,9 +500,12 @@ RSFECProcessor::GetInverseMatrixByGuassianElemination(Matrix2DUInt8& mat)
       work_mat[line][column_idx] = 0;
     }
   }
+#ifdef DEBUG
+  DbgPrintMatrix2D(work_mat, "work_mat inversed:\n");
+#endif
 
   Matrix2DUInt8 ret(k, Matrix1DUint8(k));
-  for (int32_t i; i<k; i++) {
+  for (int32_t i=0; i<k; i++) {
     std::memcpy(ret[i].data(), work_mat[i].data(), k);
   }
   return ret;
@@ -503,6 +543,24 @@ void RSFECProcessor::Matrix1DAddition(uint8_t *a, uint8_t*b,
   return;
 }
 
+  /**
+   * array a will be devided by factor:
+   * 
+   * a[i]/factor = a[i] * factor_mie
+   */
+void RSFECProcessor::Normalize1DMatrix(uint8_t *a, int32_t count, 
+                                       uint8_t factor)
+{
+  //mie = multiplicative inverse element:
+  uint8_t mie = kMIETable[factor];
+  for (int32_t i=0; i<count; i++) {
+    a[i] = gf256_mul(a[i], mie);
+  }
+  return;
+}
+
+
+
 #ifdef DEBUG
 /**
  * pattern:
@@ -530,7 +588,7 @@ std::string RSFECProcessor::DbgPrintMatrix1D(const Matrix1DUint8& mat,
     else if (std::next(it) == mat.end()) {
       //last value
       oss_1d_ << "0x" << std::setw(2) << static_cast<uint32_t>(*it)
-           << "}\n";
+           << "}";
     }
     else {
       //middle value
@@ -559,12 +617,13 @@ std::string RSFECProcessor::DbgPrintMatrix1D(const Matrix1DUint8& mat,
  *  }
  */
 void RSFECProcessor::DbgPrintMatrix2D(const Matrix2DUInt8& mat,
-                                     const std::string& log_prefix)
+                                      const std::string& log_prefix,
+                                      bool output_to_console)
 {
   oss_2d_.str("");
 
   if (!log_prefix.empty()) {
-    oss_2d_ << log_prefix << "\n";
+    oss_2d_ << log_prefix;
   }
   oss_2d_ << "{\n";
 
@@ -573,7 +632,9 @@ void RSFECProcessor::DbgPrintMatrix2D(const Matrix2DUInt8& mat,
   }
 
   oss_2d_ << "}\n";
-  std::cout << oss_2d_.str();
+
+  if (output_to_console)
+    std::cout << oss_2d_.str();
 }
 #endif
 

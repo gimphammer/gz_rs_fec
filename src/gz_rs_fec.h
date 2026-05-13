@@ -2,7 +2,7 @@
  * @Author: gimphammer@gmail.com
  * @Date: 2026-05-05 17:49:51
  * @LastEditors: gimphammer@gmail.com
- * @LastEditTime: 2026-05-10 17:33:44
+ * @LastEditTime: 2026-05-13 18:56:12
  * @Copyright: Copyright (c) 2026 by gimphammer@gmail.com, All rights reserved.
  * @Description: [None]
  */
@@ -63,17 +63,14 @@ public:
    * 
    * @return redundant package only
    */
-  //TO IMPLEMENT
   std::vector<Package> Encode(const std::vector<Package>& src_pkg);
   
   /** 
    * 1. dec matrix update coderoutine
    * 2. matrix multiplication
    */
-  //TO IMPLEMENT
   std::vector<Package> Decode(const std::vector<Package>& rcv_pkgs);
 
-  //TO IMPLEMENT
   static std::vector<Package> AllocPackages(int32_t data_size, int32_t pkg_count);
 
   /**
@@ -112,6 +109,11 @@ private:
    */
   inline void Matrix1DAddition(uint8_t *a, uint8_t*b, uint8_t b_times, int32_t count);
 
+  /**
+   * array a will be devided by factor:
+   */
+  inline void Normalize1DMatrix(uint8_t *a, int32_t count, uint8_t factor);
+
   //TO IMPLEMENT
   // inline uint8_t Matrix1DDotProduction(uint8_t *a, uint8_t*b, int32_t count);
 
@@ -128,6 +130,8 @@ private:
                                        int32_t byte_idx, 
                                        std::vector<Package>& dec_pkgs);
 
+
+
   /**
    * @return true mean valid, false means invalid
    * 
@@ -139,12 +143,24 @@ private:
                                const std::string& log_prefix = "", 
                                bool return_log = false);
   void DbgPrintMatrix2D(const Matrix2DUInt8& mat, 
-                        const std::string& log_prefix = "");
+                        const std::string& log_prefix = "", 
+                        // output_to_console=false for debug view
+                        bool output_to_console = true); 
 #endif
 
   
 
 private:  
+#ifdef DEBUG
+  std::ostringstream oss_1d_;
+  std::ostringstream oss_2d_;
+#endif
+  //(n, k)
+  uint32_t n_;
+  uint32_t k_;
+
+  bool first_dec_;
+
   //decided by init parameter: (n,k)
   Matrix2DUInt8 enc_matrix_; 
 
@@ -153,16 +169,9 @@ private:
   //Ex. [1,1,0,1,0] means 3th and 5th package is lost
   //    if it's different from current, a new dec-matrix will be create
   std::vector<bool> last_rcv_pattern_; //size = n
-  bool first_dec_;
 
-  //(n, k)
-  uint32_t n_;
-  uint32_t k_;
 
-#ifdef DEBUG
-  std::ostringstream oss_1d_;
-  std::ostringstream oss_2d_;
-#endif
+
 };
 
 }
