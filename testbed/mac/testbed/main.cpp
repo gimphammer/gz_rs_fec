@@ -2,7 +2,7 @@
  * @Author: gimphammer@gmail.com
  * @Date: 2026-05-10 17:11:14
  * @LastEditors: gimphammer@gmail.com
- * @LastEditTime: 2026-05-13 20:39:57
+ * @LastEditTime: 2026-05-13 21:02:03
  * @Copyright: Copyright (c) 2026 by gimphammer@gmail.com, All rights reserved.
  * @Description: [None]
  */
@@ -22,7 +22,8 @@
 
 
 //TO IMPLEMENT: set path
-const std::string src_file_path="../../../testdata/lavender_small.jpg"; //
+// const std::string src_file_path="../../../testdata/lavender_small.jpg"; 
+const std::string src_file_path="../../../testdata/test_video.mp4"; 
 const std::string dst_file_path="./rcv_pic.jpg";
 
 
