@@ -5,7 +5,7 @@ This is an implementation of Reed–Solomon FEC.
 
 Performance data: 
 
-On M4 chipset, when (n,k) = (96, 32), package data lenght = 1200 bytes, the dec/enc timecost is about 1ms. In this case, FEC can resist 66% package lost.
+On M4 chipset, when (n,k) = (96, 32), package data lenght = 1200 bytes, the dec/enc timecost is about 1ms by release version. In this case, FEC can resist 66% package lost.
 
 
 
