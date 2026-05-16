@@ -69,5 +69,8 @@ Testing/
 .cache/
 .vscode/
 testbed/mac/output/
-
+*.xcuserstate
+*.xcbkptlist
+*.xcexplist
+xcuserdata/
 
