@@ -2,7 +2,7 @@
  * @Author: gimphammer@gmail.com
  * @Date: 2026-05-05 17:49:53
  * @LastEditors: gimphammer@gmail.com
- * @LastEditTime: 2026-05-15 17:39:00
+ * @LastEditTime: 2026-05-16 12:26:29
  * @Copyright: Copyright (c) 2026 by gimphammer@gmail.com, All rights reserved.
  * @Description: [None]
  */
@@ -241,8 +241,8 @@ void RSFECProcessor::EncOneByteForAllOutputPkgs(const std::vector<Package>& src_
   for (int32_t i=0; i<m; i++) {
     uint8_t result = 0;
     for (int32_t j=0; j<k_; j++) {
-//      result ^= kGF256MulTable[enc_matrix_[k_ + i][j]][src_pkgs[j].buf[data_idx]];
-      result ^= gf256_mul(enc_matrix_[k_ + i][j], src_pkgs[j].buf[data_idx]);
+      result ^= kGF256MulTable[enc_matrix_[k_ + i][j]][src_pkgs[j].buf[data_idx]];
+      // result ^= gf256_mul(enc_matrix_[k_ + i][j], src_pkgs[j].buf[data_idx]);
     }
     
     enc_pkgs[i].buf[data_idx] = result;
@@ -264,8 +264,8 @@ void RSFECProcessor::DecOneBytesForAllPackage(const std::vector<Package>& rcv_pk
     uint8_t result = 0;
 
     for (int32_t j=0; j<k_; j++) {
-//      result = kGF256MulTable[dec_matrix_[i][j]][rcv_pkgs[j].buf[byte_idx]];
-      result ^= gf256_mul(dec_matrix_[i][j], rcv_pkgs[j].buf[byte_idx]);
+      result = kGF256MulTable[dec_matrix_[i][j]][rcv_pkgs[j].buf[byte_idx]];
+      // result ^= gf256_mul(dec_matrix_[i][j], rcv_pkgs[j].buf[byte_idx]);
     }
     dec_pkgs[i].buf[byte_idx] = result;    
   }
@@ -327,8 +327,8 @@ RSFECProcessor::CreateEncMatriax(uint32_t n, uint32_t k)
 
   for (uint32_t i=k; i<n; i++) {
     for (uint32_t j=0; j<k; j++) {
-//      enc_mat[i][j] = kMIETable[x[i-k]^y[j]];
-      enc_mat[i][j] = gf256_inverse_element(x[i-k]^y[j]);
+      enc_mat[i][j] = kMIETable[x[i-k]^y[j]];
+      // enc_mat[i][j] = gf256_inverse_element(x[i-k]^y[j]);
     }
   }
 
@@ -531,8 +531,8 @@ void RSFECProcessor::Matrix1DAddition(uint8_t *a, uint8_t*b,
                                      uint8_t b_times, int32_t count)
 {
   for (int32_t i=0; i<count; i++) {
-//    uint8_t to_add = kGF256MulTable[b[i]][b_times];
-    uint8_t to_add = gf256_mul(b[i], b_times);
+    uint8_t to_add = kGF256MulTable[b[i]][b_times];
+    // uint8_t to_add = gf256_mul(b[i], b_times);
     a[i] ^= to_add;
   }
   return;
@@ -549,8 +549,8 @@ void RSFECProcessor::Normalize1DMatrix(uint8_t *a, int32_t count,
   //mie = multiplicative inverse element:
   uint8_t mie = kMIETable[factor];
   for (int32_t i=0; i<count; i++) {
-//    a[i] = kGF256MulTable[a[i]][mie];
-    a[i] = gf256_mul(a[i], mie);
+    a[i] = kGF256MulTable[a[i]][mie];
+    // a[i] = gf256_mul(a[i], mie);
   }
   return;
 }

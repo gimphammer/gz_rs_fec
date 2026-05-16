@@ -23,8 +23,8 @@
 
 //TO IMPLEMENT: set path
 //const std::string src_file_path="../../../testdata/lavender_small.jpg";
-const std::string src_file_path="../../../testdata/lavender_small.data";
-//const std::string src_file_path="../../../testdata/test_video.mp4";s
+//const std::string src_file_path="../../../testdata/lavender_small.data";
+const std::string src_file_path="../../../testdata/test_video.mp4";
 const std::string dst_file_path="./rcv_pic.data";
 
 
@@ -36,10 +36,10 @@ namespace fs = std::filesystem;
 using HiResClock = std::chrono::high_resolution_clock;
 using DurationNS = std::chrono::duration<int64_t, std::nano>;
 constexpr int64_t  kMS2NS = 1000'000;
-constexpr int32_t kGroupN = 24;
-constexpr int32_t kGroupK = 8;
+constexpr int32_t kGroupN = 96;
+constexpr int32_t kGroupK = 32;
 constexpr int32_t kGroupM = kGroupN - kGroupK; //count for fec
-constexpr uint32_t kPkgBufferSize = 1000; //bytes
+constexpr uint32_t kPkgBufferSize = 1200; //bytes
 constexpr uint32_t kGroupSrcBytes = kGroupK * kPkgBufferSize;
 
 static std::random_device g_rd;

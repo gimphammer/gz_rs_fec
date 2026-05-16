@@ -2,7 +2,7 @@
  * @Author: gimphammer@gmail.com
  * @Date: 2026-05-03 15:32:12
  * @LastEditors: gimphammer@gmail.com
- * @LastEditTime: 2026-05-10 11:16:55
+ * @LastEditTime: 2026-05-16 12:25:19
  * @Copyright: Copyright (c) 2026 by gimphammer@gmail.com, All rights reserved.
  * @Description: [None]
  */
@@ -52,6 +52,8 @@ uint8_t gf256_inverse_element(uint8_t a)
   for (uint32_t i = 0; i <7; i++) {
     a = gf256_mul(a, a);
     res = gf256_mul(res, a);
+    // a = kGF256MulTable[a][a];
+    // res = kGF256MulTable[res][a];
   }
   return res;
 }
