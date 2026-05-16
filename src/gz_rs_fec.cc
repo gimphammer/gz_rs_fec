@@ -2,7 +2,7 @@
  * @Author: gimphammer@gmail.com
  * @Date: 2026-05-05 17:49:53
  * @LastEditors: gimphammer@gmail.com
- * @LastEditTime: 2026-05-13 19:00:01
+ * @LastEditTime: 2026-05-15 17:39:00
  * @Copyright: Copyright (c) 2026 by gimphammer@gmail.com, All rights reserved.
  * @Description: [None]
  */
@@ -163,13 +163,11 @@ RSFECProcessor::Encode(const std::vector<Package>& src_pkgs)
     return {};
   }
 
-  std::vector<Package> ret_pkgs = AllocPackages(src_pkgs[0].data_size, 
-                                                  src_pkgs.size());
-  
   int32_t data_len = src_pkgs[0].data_size;
-  Matrix1DUint8 x(k_);
-  
+  int32_t enc_pkg_count = n_ - k_;
+  std::vector<Package> ret_pkgs = AllocPackages(data_len, enc_pkg_count);
 
+//  Matrix1DUint8 x(k_);
   for (int32_t i=0; i<data_len; i++) {
     EncOneByteForAllOutputPkgs(src_pkgs, i, ret_pkgs);
   }
@@ -191,10 +189,10 @@ RSFECProcessor::Decode(const std::vector<Package>& rcv_pkgs)
     return {};    
   }
 
-  std::vector<bool> current_rcv_pattern(n_);
+  std::vector<bool> current_rcv_pattern(n_, false);
   for (int32_t i=0; i < rcv_pkgs.size(); i++) {
     int32_t pkg_seq_id = rcv_pkgs[i].idx_in_group;
-    current_rcv_pattern[pkg_seq_id] = 1;
+    current_rcv_pattern[pkg_seq_id] = true;
   }
   
 
@@ -243,6 +241,7 @@ void RSFECProcessor::EncOneByteForAllOutputPkgs(const std::vector<Package>& src_
   for (int32_t i=0; i<m; i++) {
     uint8_t result = 0;
     for (int32_t j=0; j<k_; j++) {
+//      result ^= kGF256MulTable[enc_matrix_[k_ + i][j]][src_pkgs[j].buf[data_idx]];
       result ^= gf256_mul(enc_matrix_[k_ + i][j], src_pkgs[j].buf[data_idx]);
     }
     
@@ -253,17 +252,19 @@ void RSFECProcessor::EncOneByteForAllOutputPkgs(const std::vector<Package>& src_
 
 /**
  * D = Gs^-1 
- * [X] = [D] * [Y] 
+ * [X] = [D] * [Y]
+ * [D] dimention = [k x k], [Y] dimention = k
  */
-void RSFECProcessor::DecOneBytesForAllPackage(const std::vector<Package>& rcv_pkgs, 
+void RSFECProcessor::DecOneBytesForAllPackage(const std::vector<Package>& rcv_pkgs,
                                              int32_t byte_idx, 
                                              std::vector<Package>& dec_pkgs)
 {
-  int32_t m = n_ - k_;
-  for (int32_t i=0; i<m; i++){
+  int32_t dec_pkg_count = k_;
+  for (int32_t i=0; i<dec_pkg_count; i++){
     uint8_t result = 0;
 
     for (int32_t j=0; j<k_; j++) {
+//      result = kGF256MulTable[dec_matrix_[i][j]][rcv_pkgs[j].buf[byte_idx]];
       result ^= gf256_mul(dec_matrix_[i][j], rcv_pkgs[j].buf[byte_idx]);
     }
     dec_pkgs[i].buf[byte_idx] = result;    
@@ -326,11 +327,12 @@ RSFECProcessor::CreateEncMatriax(uint32_t n, uint32_t k)
 
   for (uint32_t i=k; i<n; i++) {
     for (uint32_t j=0; j<k; j++) {
+//      enc_mat[i][j] = kMIETable[x[i-k]^y[j]];
       enc_mat[i][j] = gf256_inverse_element(x[i-k]^y[j]);
     }
   }
 
-#ifdef DEBUG
+#ifdef DEBUG_ISSUE
   std::string log_prefix = "Create Enc Matrix:\n";
   DbgPrintMatrix2D(enc_mat, log_prefix);
 #endif
@@ -369,14 +371,14 @@ RSFECProcessor::CreateDecMatrix(const std::vector<bool>& rcv_indicators)
   //1. get selected lines from enc_matrix to organize the g_selected_mat
   Matrix2DUInt8 g_selected_mat(k_, Matrix1DUint8(k_));
   uint32_t rcv_count=0;
-  for (int32_t i=0; i<n_, rcv_count < k_; i++) {
+  for (int32_t i=0; i<n_ && rcv_count < k_; i++) {
     if (rcv_indicators[i]) {
       g_selected_mat[rcv_count] = enc_matrix_[i];
       rcv_count++;
     }
   }
   
-#ifdef DEBUG
+#ifdef DEBUG_ISSUE
   DbgPrintMatrix2D(g_selected_mat, "g_selected_mat:\n");
 #endif
 
@@ -387,7 +389,7 @@ RSFECProcessor::CreateDecMatrix(const std::vector<bool>& rcv_indicators)
   Matrix2DUInt8 dec_mat = 
     GetInverseMatrixByGuassianElemination(g_selected_mat);
 
-#ifdef DEBUG
+#ifdef DEBUG_ISSUE
   DbgPrintMatrix2D(dec_mat, "dec_mat generated:\n");
 #endif
   
@@ -416,7 +418,7 @@ RSFECProcessor::GetInverseMatrixByGuassianElemination(Matrix2DUInt8& mat)
     }    
   }
 
-#ifdef DEBUG
+#ifdef DEBUG_ISSUE
   DbgPrintMatrix2D(mat, "input mat for caculating inverse matrix: ");
   DbgPrintMatrix2D(work_mat, "init [I, A] = ");
 #endif 
@@ -435,14 +437,6 @@ RSFECProcessor::GetInverseMatrixByGuassianElemination(Matrix2DUInt8& mat)
         if (work_mat[line_2_find][target_y_pos]) {          
           Switch1DMatrix(work_mat[line_2_find], work_mat[line]);
           find_pivot = true;
-//#ifdef DEBUG
-//          std::ostringstream dbg_oss;
-//          dbg_oss << "work_mat, now process line(" << line
-//                  <<"), switch to   line(" << line_2_find
-//                  <<"), after switch:\n";
-//          DbgPrintMatrix2D(work_mat, dbg_oss.str(), true);
-//          int aaaa = 1;
-//#endif
           break;
         }
       }
@@ -466,7 +460,7 @@ RSFECProcessor::GetInverseMatrixByGuassianElemination(Matrix2DUInt8& mat)
     }
   }
 
-#ifdef DEBUG
+#ifdef DEBUG_ISSUE
   DbgPrintMatrix2D(work_mat, "work_mat position preparation done:\n");
 #endif
   
@@ -500,7 +494,7 @@ RSFECProcessor::GetInverseMatrixByGuassianElemination(Matrix2DUInt8& mat)
       work_mat[line][column_idx] = 0;
     }
   }
-#ifdef DEBUG
+#ifdef DEBUG_ISSUE
   DbgPrintMatrix2D(work_mat, "work_mat inversed:\n");
 #endif
 
@@ -522,7 +516,7 @@ void RSFECProcessor::Switch1DMatrix(Matrix1DUint8 &mat_a, Matrix1DUint8 &mat_b)
 
   uint8_t temp;
   auto a = mat_a.begin(), b = mat_b.begin(); 
-  for (; a != mat_a.end(), b != mat_b.end(); a++, b++) {
+  for (; a != mat_a.end() && b != mat_b.end(); a++, b++) {
     temp = *a;
     *a = *b;
     *b = temp;
@@ -537,6 +531,7 @@ void RSFECProcessor::Matrix1DAddition(uint8_t *a, uint8_t*b,
                                      uint8_t b_times, int32_t count)
 {
   for (int32_t i=0; i<count; i++) {
+//    uint8_t to_add = kGF256MulTable[b[i]][b_times];
     uint8_t to_add = gf256_mul(b[i], b_times);
     a[i] ^= to_add;
   }
@@ -554,6 +549,7 @@ void RSFECProcessor::Normalize1DMatrix(uint8_t *a, int32_t count,
   //mie = multiplicative inverse element:
   uint8_t mie = kMIETable[factor];
   for (int32_t i=0; i<count; i++) {
+//    a[i] = kGF256MulTable[a[i]][mie];
     a[i] = gf256_mul(a[i], mie);
   }
   return;

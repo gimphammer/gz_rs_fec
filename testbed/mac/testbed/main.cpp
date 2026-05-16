@@ -2,7 +2,7 @@
  * @Author: gimphammer@gmail.com
  * @Date: 2026-05-10 17:11:14
  * @LastEditors: gimphammer@gmail.com
- * @LastEditTime: 2026-05-13 21:02:03
+ * @LastEditTime: 2026-05-14 19:08:58
  * @Copyright: Copyright (c) 2026 by gimphammer@gmail.com, All rights reserved.
  * @Description: [None]
  */
@@ -18,13 +18,14 @@
 #include <cstdint>
 #include <random>
 #include <algorithm>
-
+#include <chrono>
 
 
 //TO IMPLEMENT: set path
-// const std::string src_file_path="../../../testdata/lavender_small.jpg"; 
-const std::string src_file_path="../../../testdata/test_video.mp4"; 
-const std::string dst_file_path="./rcv_pic.jpg";
+//const std::string src_file_path="../../../testdata/lavender_small.jpg";
+const std::string src_file_path="../../../testdata/lavender_small.data";
+//const std::string src_file_path="../../../testdata/test_video.mp4";s
+const std::string dst_file_path="./rcv_pic.data";
 
 
 
@@ -32,15 +33,20 @@ const std::string dst_file_path="./rcv_pic.jpg";
 
 using namespace gz_rs_fec;
 namespace fs = std::filesystem;
-constexpr uint32_t kGroupN = 16;
-constexpr uint32_t kGroupK = 8;
-constexpr uint32_t kGroupM = kGroupN - kGroupK; //count for fec
-constexpr uint32_t kPkgBufferSize = 1200; //bytes
+using HiResClock = std::chrono::high_resolution_clock;
+using DurationNS = std::chrono::duration<int64_t, std::nano>;
+constexpr int64_t  kMS2NS = 1000'000;
+constexpr int32_t kGroupN = 24;
+constexpr int32_t kGroupK = 8;
+constexpr int32_t kGroupM = kGroupN - kGroupK; //count for fec
+constexpr uint32_t kPkgBufferSize = 1000; //bytes
 constexpr uint32_t kGroupSrcBytes = kGroupK * kPkgBufferSize;
 
 static std::random_device g_rd;
 static std::mt19937 g_generator(g_rd());
-static std::uniform_int_distribution<int32_t> g_src_dist(1, (kGroupK-1));
+constexpr int32_t kMinSrcPkgCount = std::max((kGroupK - kGroupM), (int32_t)1);
+constexpr int32_t kMaxSrcPkgCount = std::max((kGroupK-1), kMinSrcPkgCount);
+static std::uniform_int_distribution<int32_t> g_src_dist(kMinSrcPkgCount, kMaxSrcPkgCount);
 
 
 /**
@@ -52,10 +58,14 @@ static std::uniform_int_distribution<int32_t> g_src_dist(1, (kGroupK-1));
  */
 bool random_pick_src_and_fec_pkgs(std::vector<int32_t>& src_picks,
                                   std::vector<int32_t>& fec_picks,
-                                  uint32_t n,
-                                  uint32_t k);
+                                  uint32_t k,
+                                  uint32_t m);
 
 int main(int argc, const char * argv[]) {
+
+
+  std::cout << "kMinSrcPkgCount=" << kMinSrcPkgCount 
+            << ", kMaxSrcPkgCount=" << kMaxSrcPkgCount<<"\n";
 
   std::fstream read_fs(src_file_path, std::ios::binary | std::ios::in);
   if (!read_fs.is_open()) {
@@ -93,8 +103,17 @@ int main(int argc, const char * argv[]) {
 
   std::vector<int32_t> src_picks(kGroupK);
   std::vector<int32_t> fec_picks(kGroupM);
+  
+  auto start = std::chrono::high_resolution_clock::now();
+  
+  
   //Normal Package Process
-  uint32_t normal_group_count  = src_file_size / kGroupSrcBytes;  
+  DurationNS total_enc_cost_ns;
+  DurationNS total_dec_cost_ns;
+  int64_t enc_count = 0;
+  int64_t dec_count = 0;
+  
+  uint32_t normal_group_count  = src_file_size / kGroupSrcBytes;
   for (int32_t i = 0; i<normal_group_count; i++) {
     //read data from file
     int32_t step_read_bytes = 0;
@@ -103,17 +122,27 @@ int main(int argc, const char * argv[]) {
       step_read_bytes = read_fs.gcount();
     }
 
-
+    auto start_ts = HiResClock::now();
     std::vector<Package> fec_pkgs = fec_processor->Encode(src_pkgs);
-
+    auto end_ts = HiResClock::now();
+    total_enc_cost_ns += end_ts - start_ts;
+    enc_count++;
+    
     //simulate package lost
     src_picks.resize(kGroupK);
     fec_picks.resize(kGroupM);
-    if (!random_pick_src_and_fec_pkgs(src_picks, fec_picks, kGroupN, kGroupK)) {
+    if (!random_pick_src_and_fec_pkgs(src_picks, fec_picks, kGroupK, kGroupM)) {
       std::cout << "[ERR][APP] Pos-A, random_pick_src_and_fec_pkgs failed. \n";
       return -1;
     }
 
+    ///////////////////////////////////////////////////
+    
+//    src_picks = {0,1,2,4,5,6,7};
+//    fec_picks = {2};
+    ///////////////////////////////////////
+
+    
     if (src_picks.size() + fec_picks.size() != kGroupK) {
       std::cout << "[ERR][APP] Pos-A src rcv count("<<src_picks.size()
                 << "), fec rcv count("<<fec_picks.size()<<"), total count is not "
@@ -134,24 +163,27 @@ int main(int argc, const char * argv[]) {
       rcv_pkgs[rcv_pkg_idx] = fec_pkgs[index];
       rcv_pkgs[rcv_pkg_idx].idx_in_group = index + kGroupK; //fec pkg index starts from k
     }
-    //////////////////////////////////////////
-    //for debug:
-    // std::vector<int32_t> dbg_index = {2,3,4,7,10,11,14,15};
-    // for (int i=0; i<8; i++) {
-    //   rcv_pkgs[i].idx_in_group = dbg_index[i];
-    // }
-    
-    //////////////////////////////////////////
-    
     
     //at receive endian
+    start_ts = HiResClock::now();
     std::vector<Package> dec_pkgs = fec_processor->Decode(rcv_pkgs);
-
+    end_ts = HiResClock::now();
+    dec_count++;
+    total_dec_cost_ns += end_ts - start_ts;
+    
     //write to file
     for (auto pkg: dec_pkgs) {
       write_fs.write((char*)pkg.buf, pkg.data_size);
     }
   }
+  
+  //statistic for performance
+  int64_t ms_per_enc = total_enc_cost_ns.count() / (enc_count*kMS2NS);
+  int64_t ms_per_dec = total_dec_cost_ns.count() / (dec_count*kMS2NS);
+  std::cout << "Statistics for Normal Pkg: \n"
+            << "  (n,k) = ("<<kGroupN<<", "<<kGroupK<<"), data block size=" << kPkgBufferSize<<"\n"
+            << "  ms per enc: " << ms_per_enc << ", process count="<<enc_count<<"\n"
+            << "  ms per dec: " << ms_per_dec << ", process count="<<dec_count<<"\n";
 
   //Tail Package Process
   int32_t tail_count = 0;
@@ -182,7 +214,7 @@ int main(int argc, const char * argv[]) {
 
   src_picks.resize(kGroupK);
   fec_picks.resize(kGroupM);
-  if (!random_pick_src_and_fec_pkgs(src_picks, fec_picks, kGroupN, kGroupK)) {
+  if (!random_pick_src_and_fec_pkgs(src_picks, fec_picks, kGroupK, kGroupM)) {
     std::cout << "[ERR][APP] Pos-B, random_pick_src_and_fec_pkgs failed. \n";
     return -1;
   }
@@ -196,8 +228,6 @@ int main(int argc, const char * argv[]) {
 
   //simulate lost senario
   int32_t pkg_rcv_count = 0;
-  int32_t src_picked_count = 0;
-  int32_t fec_picked_count = 0;
   for (auto index : src_picks) {
     int32_t rcv_pkg_idx = pkg_rcv_count++;
     rcv_pkgs[rcv_pkg_idx] = src_pkgs[index];
@@ -211,8 +241,9 @@ int main(int argc, const char * argv[]) {
   }
   
   //at receive endian
+
   std::vector<Package> dec_pkgs = fec_processor->Decode(rcv_pkgs);
-  
+
   for (auto &pkg: dec_pkgs) {
     if (!tail_bytes)
       break;
@@ -236,23 +267,17 @@ int main(int argc, const char * argv[]) {
 
 bool random_pick_src_and_fec_pkgs(std::vector<int32_t> &src_picks,/* size = k*/
                                   std::vector<int32_t> &fec_picks,/* size = n-k */
-                                  uint32_t n,
-                                  uint32_t k)
+                                  uint32_t k,
+                                  uint32_t m)
 {
 
-  if (k >= n)
-    return false;
-
-  int32_t m = n - k;  
-  if (k != src_picks.size() || m != fec_picks.size())
-    return false;
 
   std::iota(src_picks.begin(), src_picks.end(), 0);
   std::iota(fec_picks.begin(), fec_picks.end(), 0);
   
   uint32_t src_count = g_src_dist(g_generator);
   uint32_t fec_count = k - src_count;
-
+  
   std::shuffle(src_picks.begin(), src_picks.end(), g_generator);
   std::shuffle(fec_picks.begin(), fec_picks.end(), g_generator);
 
@@ -261,6 +286,6 @@ bool random_pick_src_and_fec_pkgs(std::vector<int32_t> &src_picks,/* size = k*/
 
   std::sort(src_picks.begin(), src_picks.end());
   std::sort(fec_picks.begin(), fec_picks.end());
-
+  
   return true;
 }

@@ -124,7 +124,7 @@ private:
    */
   inline void EncOneByteForAllOutputPkgs(const std::vector<Package>& src_pkgs, 
                                          int32_t byte_idx,
-                                        std::vector<Package>& enc_pkgs);
+                                         std::vector<Package>& enc_pkgs);
 
   inline void DecOneBytesForAllPackage(const std::vector<Package>& rcv_pkgs, 
                                        int32_t byte_idx, 
