@@ -1,5 +1,5 @@
 # gz_rs_fec
-This is an implementation of RS FEC.
+This is an implementation of Reed–Solomon FEC.
 
 
 
