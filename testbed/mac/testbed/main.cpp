@@ -2,7 +2,7 @@
  * @Author: gimphammer@gmail.com
  * @Date: 2026-05-10 17:11:14
  * @LastEditors: gimphammer@gmail.com
- * @LastEditTime: 2026-05-17 17:25:08
+ * @LastEditTime: 2026-05-17 17:29:28
  * @Copyright: Copyright (c) 2026 by gimphammer@gmail.com, All rights reserved.
  * @Description: [None]
  */
@@ -264,8 +264,6 @@ bool random_pick_src_and_fec_pkgs(std::vector<int32_t> &src_picks,/* size = k*/
                                   uint32_t k,
                                   uint32_t m)
 {
-
-
   std::iota(src_picks.begin(), src_picks.end(), 0);
   std::iota(fec_picks.begin(), fec_picks.end(), 0);
   

@@ -1,5 +1,5 @@
 # gz_rs_fec
-This is an implementation of Reed–Solomon FEC.
+This is C++ an implementation of Reed–Solomon FEC based on $\text{GF}(2^8)$
 
 
 
