@@ -2,7 +2,7 @@
  * @Author: gimphammer@gmail.com
  * @Date: 2026-05-10 17:11:14
  * @LastEditors: gimphammer@gmail.com
- * @LastEditTime: 2026-05-14 19:08:58
+ * @LastEditTime: 2026-05-17 17:25:08
  * @Copyright: Copyright (c) 2026 by gimphammer@gmail.com, All rights reserved.
  * @Description: [None]
  */
@@ -21,11 +21,11 @@
 #include <chrono>
 
 
-//TO IMPLEMENT: set path
+//et path
 //const std::string src_file_path="../../../testdata/lavender_small.jpg";
 //const std::string src_file_path="../../../testdata/lavender_small.data";
 const std::string src_file_path="../../../testdata/test_video.mp4";
-const std::string dst_file_path="./rcv_pic.data";
+const std::string dst_file_path="./rcv_data.data";
 
 
 
@@ -35,9 +35,9 @@ using namespace gz_rs_fec;
 namespace fs = std::filesystem;
 using HiResClock = std::chrono::high_resolution_clock;
 using DurationNS = std::chrono::duration<int64_t, std::nano>;
-constexpr int64_t  kMS2NS = 1000'000;
-constexpr int32_t kGroupN = 96;
-constexpr int32_t kGroupK = 32;
+constexpr int64_t  kMS2NS = 1000'000; //transform between ns and ms
+constexpr int32_t kGroupN = 48;
+constexpr int32_t kGroupK = 16;
 constexpr int32_t kGroupM = kGroupN - kGroupK; //count for fec
 constexpr uint32_t kPkgBufferSize = 1200; //bytes
 constexpr uint32_t kGroupSrcBytes = kGroupK * kPkgBufferSize;
@@ -135,13 +135,6 @@ int main(int argc, const char * argv[]) {
       std::cout << "[ERR][APP] Pos-A, random_pick_src_and_fec_pkgs failed. \n";
       return -1;
     }
-
-    ///////////////////////////////////////////////////
-    
-//    src_picks = {0,1,2,4,5,6,7};
-//    fec_picks = {2};
-    ///////////////////////////////////////
-
     
     if (src_picks.size() + fec_picks.size() != kGroupK) {
       std::cout << "[ERR][APP] Pos-A src rcv count("<<src_picks.size()
@@ -241,7 +234,6 @@ int main(int argc, const char * argv[]) {
   }
   
   //at receive endian
-
   std::vector<Package> dec_pkgs = fec_processor->Decode(rcv_pkgs);
 
   for (auto &pkg: dec_pkgs) {
@@ -258,7 +250,9 @@ int main(int argc, const char * argv[]) {
   }
 
   // insert code here...
-  std::cout << "Hello, World!\n";
+  std::cout << "Process Done, Check the received data by manual!\n";
+  std::cout << "Received data: ${test_project}/mac/output/build/" << dst_file_path << "\n";
+  std::cout << "Change the extension name of rcv-file to the format you needed\n";
   read_fs.close();
   write_fs.close();
   return EXIT_SUCCESS;
