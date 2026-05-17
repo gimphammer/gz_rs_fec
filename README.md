@@ -3,15 +3,21 @@ This is an C++  implementation of Reed–Solomon FEC based on $\text{GF}(2^8)$
 
 
 
+
+
 Performance data: 
 
 On M4 chipset, when (n,k) = (96, 32), package data lenght = 1200 bytes, the dec/enc timecost is about 1ms by release version. In this case, FEC can resist 66% package lost.
 
 
 
+
+
 Platform Support:
 
 Now is only support Mac. But it's easy to port to other platforms basd on C++.
+
+
 
 
 
